@@ -16,7 +16,7 @@
                 <h1 class="text-3xl font-black bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                     AI Video Automation Studio Pro
                 </h1>
-                <p class="text-slate-400 text-sm mt-1">Context-Matched Visuals, Full Playback Controls, & Strict Filters</p>
+                <p class="text-slate-400 text-sm mt-1">Cross-Platform MP4 Compatibility & Strict Visual Matching</p>
             </div>
             <div class="flex items-center gap-2">
                 <input type="password" id="apiKey" placeholder="Pexels API Key" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 w-48">
@@ -116,7 +116,6 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
         let usedVideoHashes = new Set();
         let currentPlaylistIndex = 0;
 
-        // Persistent API Key Logic
         const apiKeyInput = document.getElementById('apiKey');
         const savedKey = localStorage.getItem('pexels_api_key');
         if (savedKey) apiKeyInput.value = savedKey;
@@ -156,7 +155,6 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
                     const wordCount = line.split(" ").length;
                     const duration = Math.max(Math.round((wordCount / 150) * 60), 3);
 
-                    // Context-Matched Visual Prompt Generation
                     let translatedPrompt = `${line} cinematic high quality 4k slow motion`;
                     if (exclFemales) {
                         translatedPrompt += " -woman -girl -female -lady -women -girls -mother -daughter -model -bikini -babe -person";
@@ -202,7 +200,6 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
             }
         }
 
-        // Ironclad Anti-Female Blacklist Check with Context Preservation
         function selectStrictFilteredVideo(videos, usedHashes, aspectRatio, exclFemales, scriptLine) {
             const forbiddenTerms = [
                 'woman', 'women', 'girl', 'girls', 'female', 'females', 'lady', 'ladies', 
@@ -232,7 +229,11 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
 
                 usedHashes.add(v.id);
                 const targetPortrait = aspectRatio === "9:16";
-                const bestFile = v.video_files.find(f => (f.height > f.width) === targetPortrait) || v.video_files[0];
+                // Select highest definition MP4 file
+                const mp4Files = v.video_files.filter(f => f.file_type === 'video/mp4');
+                mp4Files.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+                
+                const bestFile = mp4Files.find(f => (f.height > f.width) === targetPortrait) || mp4Files[0] || v.video_files[0];
                 return {
                     id: v.id,
                     url: bestFile.link,
@@ -371,6 +372,7 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
             saveAs(blob, "Scene_Script_Document.txt");
         };
 
+        // Cross-Platform Windows/Mac ZIP Packaging with Explicit MP4 MIME Types
         document.getElementById('zipBtn').addEventListener('click', async () => {
             if (currentScenes.length === 0) return;
             const zipBtn = document.getElementById('zipBtn');
@@ -394,9 +396,10 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
                 srtText += `${s.id}\n${startTimeStr} --> ${endTimeStr}\n${s.script}\n\n`;
 
                 try {
+                    // Fetch with explicit binary arraybuffer to prevent Windows corruption
                     const response = await fetch(s.asset.url);
-                    const blob = await response.blob();
-                    zip.file(fileName, blob);
+                    const arrayBuffer = await response.arrayBuffer();
+                    zip.file(fileName, arrayBuffer, { binary: true });
                 } catch (e) {
                     console.error(`Failed to download clip ${s.id}`, e);
                 }
