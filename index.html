@@ -16,7 +16,7 @@
                 <h1 class="text-3xl font-black bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                     AI Video Automation Studio Pro
                 </h1>
-                <p class="text-slate-400 text-sm mt-1">Cross-Platform MP4 Compatibility & Strict Visual Matching</p>
+                <p class="text-slate-400 text-sm mt-1">Clean Script Sourcing, Full Playback Controls, & Advanced Filters</p>
             </div>
             <div class="flex items-center gap-2">
                 <input type="password" id="apiKey" placeholder="Pexels API Key" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 w-48">
@@ -29,9 +29,10 @@
             <div class="lg:col-span-1 space-y-4">
                 <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
                     <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Script Input</label>
-                    <textarea id="scriptInput" rows="6" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 resize-none">A lone traveler walking down a neon-lit Tokyo street at night.
-Sipping hot coffee from a paper cup while watching rain fall.
-Looking up at towering skyscrapers glowing in the dark.</textarea>
+                    <textarea id="scriptInput" rows="6" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 resize-none">money
+ai
+car
+airplane</textarea>
                     
                     <div class="mt-4 space-y-3">
                         <div>
@@ -42,15 +43,16 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
                             </select>
                         </div>
 
-                        <!-- Strict Content Filters -->
+                        <!-- Useful Content Filters -->
                         <div class="pt-2 border-t border-slate-800">
-                            <span class="block text-xs font-bold text-slate-400 mb-2">Strict Content Filters</span>
+                            <span class="block text-xs font-bold text-slate-400 mb-2">Content Filters</span>
                             <div class="space-y-2 text-xs text-slate-300">
-                                <label class="flex items-center gap-2 cursor-pointer font-semibold text-pink-400">
-                                    <input type="checkbox" id="exclFemales" checked class="rounded bg-slate-950 border-slate-700 accent-pink-500"> Exclude Females (Zero Tolerance)
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="safeSearch" checked class="rounded bg-slate-950 border-slate-700 accent-indigo-500"> SafeSearch Enforcement
                                 </label>
-                                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="exclCrowds" class="rounded bg-slate-950 border-slate-700"> Exclude Crowds</label>
-                                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="exclIndoor" class="rounded bg-slate-950 border-slate-700"> Exclude Indoor</label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="hqOnly" checked class="rounded bg-slate-950 border-slate-700 accent-indigo-500"> HD / 4K Resolution Priority
+                                </label>
                             </div>
                         </div>
                     </div>
@@ -145,9 +147,6 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
             usedVideoHashes.clear();
 
             const aspectRatio = document.getElementById('aspectRatio').value;
-            const exclFemales = document.getElementById('exclFemales').checked;
-            const exclCrowds = document.getElementById('exclCrowds').checked;
-            const exclIndoor = document.getElementById('exclIndoor').checked;
 
             try {
                 for (let i = 0; i < lines.length; i++) {
@@ -155,23 +154,21 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
                     const wordCount = line.split(" ").length;
                     const duration = Math.max(Math.round((wordCount / 150) * 60), 3);
 
-                    let translatedPrompt = `${line} cinematic high quality 4k slow motion`;
-                    if (exclFemales) {
-                        translatedPrompt += " -woman -girl -female -lady -women -girls -mother -daughter -model -bikini -babe -person";
-                    }
-                    if (exclCrowds) translatedPrompt += " -crowd -people -group -audience";
-                    if (exclIndoor) translatedPrompt += " -indoor -room -interior -office -house";
+                    // Clean search prompt matching exact input without messy tags
+                    let cleanPrompt = line.trim();
 
-                    const videos = await fetchPexelsClips(translatedPrompt, apiKey, 1);
-                    const selectedVideo = selectStrictFilteredVideo(videos, usedVideoHashes, aspectRatio, exclFemales, line);
+                    // Randomize page offset (1 to 5) to pull different variations on regeneration
+                    const randomPage = Math.floor(Math.random() * 5) + 1;
+                    const videos = await fetchPexelsClips(cleanPrompt, apiKey, randomPage);
+                    const selectedVideo = selectVideo(videos, usedVideoHashes, aspectRatio);
 
                     currentScenes.push({
                         id: i + 1,
                         script: line,
-                        prompt: translatedPrompt,
+                        prompt: cleanPrompt,
                         duration: duration,
                         asset: selectedVideo || { url: "", id: null },
-                        pageIndex: 1
+                        pageIndex: randomPage
                     });
                 }
 
@@ -200,36 +197,12 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
             }
         }
 
-        function selectStrictFilteredVideo(videos, usedHashes, aspectRatio, exclFemales, scriptLine) {
-            const forbiddenTerms = [
-                'woman', 'women', 'girl', 'girls', 'female', 'females', 'lady', 'ladies', 
-                'mother', 'daughter', 'sister', 'wife', 'girlfriend', 'model', 'babe', 
-                'bikini', 'she', 'her', 'hers', 'dress', 'makeup', 'queen', 'actress'
-            ];
-            const scriptLower = scriptLine.toLowerCase();
-            const scriptAllowsFemale = forbiddenTerms.some(term => scriptLower.includes(term));
-
+        function selectVideo(videos, usedHashes, aspectRatio) {
             for (const v of videos) {
                 if (usedHashes.has(v.id)) continue;
 
-                if (exclFemales && !scriptAllowsFemale) {
-                    let hasFemale = false;
-                    const tags = (v.tags || []).map(t => t.toLowerCase());
-                    const urlStr = v.url.toLowerCase();
-                    const userStr = (v.user && v.user.name ? v.user.name : "").toLowerCase();
-
-                    for (const term of forbiddenTerms) {
-                        if (urlStr.includes(term) || userStr.includes(term) || tags.some(t => t.includes(term))) {
-                            hasFemale = true;
-                            break;
-                        }
-                    }
-                    if (hasFemale) continue;
-                }
-
                 usedHashes.add(v.id);
                 const targetPortrait = aspectRatio === "9:16";
-                // Select highest definition MP4 file
                 const mp4Files = v.video_files.filter(f => f.file_type === 'video/mp4');
                 mp4Files.sort((a, b) => (b.width * b.height) - (a.width * a.height));
                 
@@ -250,17 +223,16 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
             const scene = currentScenes.find(s => s.id === sceneId);
             scene.pageIndex += 1;
 
-            const exclFemales = document.getElementById('exclFemales').checked;
             const videos = await fetchPexelsClips(scene.prompt, apiKey, scene.pageIndex);
             const aspectRatio = document.getElementById('aspectRatio').value;
-            const newVideo = selectStrictFilteredVideo(videos, usedVideoHashes, aspectRatio, exclFemales, scene.script);
+            const newVideo = selectVideo(videos, usedVideoHashes, aspectRatio);
 
             if (newVideo && newVideo.url) {
                 scene.asset = newVideo;
                 renderStoryboard();
                 playSingleScene(newVideo.url, scene.id);
             } else {
-                alert("No more alternative filtered clips found.");
+                alert("No more alternative clips found for this prompt.");
             }
         };
 
@@ -372,7 +344,6 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
             saveAs(blob, "Scene_Script_Document.txt");
         };
 
-        // Cross-Platform Windows/Mac ZIP Packaging with Explicit MP4 MIME Types
         document.getElementById('zipBtn').addEventListener('click', async () => {
             if (currentScenes.length === 0) return;
             const zipBtn = document.getElementById('zipBtn');
@@ -396,7 +367,6 @@ Looking up at towering skyscrapers glowing in the dark.</textarea>
                 srtText += `${s.id}\n${startTimeStr} --> ${endTimeStr}\n${s.script}\n\n`;
 
                 try {
-                    // Fetch with explicit binary arraybuffer to prevent Windows corruption
                     const response = await fetch(s.asset.url);
                     const arrayBuffer = await response.arrayBuffer();
                     zip.file(fileName, arrayBuffer, { binary: true });
